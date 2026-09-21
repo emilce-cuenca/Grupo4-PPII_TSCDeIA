@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard de Combustibles y Variables Económicas | Grupo 4 - PPII</title>
+  <meta name="description"
+    content="Dashboard interactivo de análisis de consumo de combustibles, precios en surtidor y cotización del dólar en Argentina (2017-2025). Grupo 4 - Tecnicatura Superior en Ciencia de Datos e IA.">
+
+  <!-- Tipografías de Google Fonts: Outfit e Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Estilos Custom -->
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+
+  <div class="app-container">
+
+    <!-- Header Principal -->
+    <header class="header-bar">
+      <div class="brand-section">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3v18h18" />
+            <path d="m19 9-5 5-4-4-3 3" />
+          </svg>
+        </div>
+        <div class="brand-meta">
+          <h1>Análisis de Combustibles & Macroeconomía</h1>
+          <p>Consumo en m³, Precios en Surtidor y Tipo de Cambio USD/ARS (2017 – 2025)</p>
+          <span class="badge-academic">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+              <path d="M6 12v5c3 3 9 3 12 0v-5" />
+            </svg>
+            Grupo 4 • Práctica Profesionalizante II (TSCDeIA)
+          </span>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <div class="status-indicator">
+          <span class="status-dot"></span>
+          <span>104 Meses Analizados</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Barra de Filtros y Controles -->
+    <section class="controls-bar" aria-label="Filtros de Período y Combustible">
+      <div class="filter-group">
+        <span class="filter-label">Período:</span>
+        <button type="button" class="preset-btn active" data-preset="all">Histórico Completo (2017-2025)</button>
+        <button type="button" class="preset-btn" data-preset="pre-covid">Pre-Pandemia (2017-2019)</button>
+        <button type="button" class="preset-btn" data-preset="covid">Pandemia (2020-2021)</button>
+        <button type="button" class="preset-btn" data-preset="recent">Reciente (2022-2025)</button>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Combustible:</span>
+        <select id="fuelSelect" class="fuel-selector-select" aria-label="Seleccionar combustible para filtrar gráficos">
+          <option value="all">Todos los Combustibles</option>
+          <option value="super">Solo Nafta Súper</option>
+          <option value="premium">Solo Nafta Premium</option>
+          <option value="gasoil">Solo Gasoil</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Grilla de Tarjetas KPI -->
+    <section class="kpis-grid" aria-label="Indicadores Clave de Rendimiento">
+      <!-- KPI 1: Consumo Total Líquidos -->
+      <article class="kpi-card kpi-total">
+        <div class="kpi-header">
+          <span class="kpi-title">Consumo Acumulado Período</span>
+          <div class="kpi-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value-wrapper">
+          <span id="kpiTotalValue" class="kpi-value">-</span>
+          <span class="kpi-unit">m³</span>
+        </div>
+        <div class="kpi-footer">
+          <span id="kpiTotalPill" class="kpi-pill neutral">-</span>
+          <span>en combustibles líquidos</span>
+        </div>
+      </article>
+
+      <!-- KPI 2: Nafta Súper -->
+      <article class="kpi-card kpi-super">
+        <div class="kpi-header">
+          <span class="kpi-title">Cuota Nafta Súper (Último Mes)</span>
+          <div class="kpi-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 2v6h6M21 12A9 9 0 0 0 6 5.3L3 8" />
+              <path d="M21 22v-6h-6M3 12a9 9 0 0 0 15 6.7l3-2.7" />
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value-wrapper">
+          <span id="kpiSuperValue" class="kpi-value">-</span>
+        </div>
+        <div class="kpi-footer">
+          <span class="kpi-pill positive">Volumen:</span>
+          <span id="kpiSuperPill">-</span>
+        </div>
+      </article>
+
+      <!-- KPI 3: Gasoil -->
+      <article class="kpi-card kpi-gasoil">
+        <div class="kpi-header">
+          <span class="kpi-title">Cuota Gasoil (Transporte/Agro)</span>
+          <div class="kpi-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="3" width="15" height="13" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+              <circle cx="5.5" cy="18.5" r="2.5" />
+              <circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value-wrapper">
+          <span id="kpiGasoilValue" class="kpi-value">-</span>
+        </div>
+        <div class="kpi-footer">
+          <span class="kpi-pill neutral">Volumen:</span>
+          <span id="kpiGasoilPill">-</span>
+        </div>
+      </article>
+
+      <!-- KPI 4: Tipo de Cambio -->
+      <article class="kpi-card kpi-usd">
+        <div class="kpi-header">
+          <span class="kpi-title">Cotización USD / ARS</span>
+          <div class="kpi-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value-wrapper">
+          <span id="kpiUsdValue" class="kpi-value">-</span>
+        </div>
+        <div class="kpi-footer">
+          <span id="kpiUsdPill" class="kpi-pill negative">-</span>
+        </div>
+      </article>
+    </section>
+
+    <!-- Grilla de Gráficos -->
+    <section class="charts-grid" aria-label="Visualizaciones Gráficas">
+
+      <!-- Gráfico 1: Evolución de Consumo -->
+      <article class="chart-card col-8">
+        <div class="chart-header">
+          <div class="chart-title-group">
+            <h3>Evolución Histórica de Consumo</h3>
+            <p>Volúmenes mensuales en metros cúbicos (m³) desglosados por tipo de combustible</p>
+          </div>
+          <div class="chart-actions">
+            <button id="btnConsumptionLines" class="chart-btn active" type="button">Líneas</button>
+            <button id="btnConsumptionStacked" class="chart-btn" type="button">Área Apilada</button>
+          </div>
+        </div>
+        <div class="chart-canvas-container">
+          <canvas id="consumptionChart"></canvas>
+        </div>
+      </article>
+
+      <!-- Gráfico 2: Efecto Sustitución Súper vs Premium -->
+      <article class="chart-card col-4">
+        <div class="chart-header">
+          <div class="chart-title-group">
+            <h3>Efecto Sustitución (Naftas)</h3>
+            <p>% Participación de mercado relativo entre Nafta Súper y Nafta Premium</p>
+          </div>
+        </div>
+        <div class="chart-canvas-container">
+          <canvas id="substitutionChart"></canvas>
+        </div>
+      </article>
+
+      <!-- Gráfico 3: Consumo vs Tipo de Cambio -->
+      <article class="chart-card col-6">
+        <div class="chart-header">
+          <div class="chart-title-group">
+            <h3>Demanda Líquida vs. Cotización del Dólar</h3>
+            <p>Doble escala temporal: Consumo (m³) vs Tipo de Cambio USD/ARS ($)</p>
+          </div>
+        </div>
+        <div class="chart-canvas-container">
+          <canvas id="usdVsConsumptionChart"></canvas>
+        </div>
+      </article>
+
+      <!-- Gráfico 4: Precios en Surtidor -->
+      <article class="chart-card col-6">
+        <div class="chart-header">
+          <div class="chart-title-group">
+            <h3>Precios en Surtidor y Paridad</h3>
+            <p>Evolución mensual del precio por litro en estaciones de servicio</p>
+          </div>
+          <div class="chart-actions">
+            <button id="btnPriceArs" class="chart-btn active" type="button">ARS ($)</button>
+            <button id="btnPriceUsd" class="chart-btn" type="button">USD (US$)</button>
+          </div>
+        </div>
+        <div class="chart-canvas-container">
+          <canvas id="pricesChart"></canvas>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- Sección de Simulación Interactiva de Demanda -->
+    <section class="simulator-section" aria-label="Simulador Interactivo de Demanda">
+      <div class="simulator-header">
+        <div>
+          <h3>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <polygon points="10 8 16 12 10 16 10 8" />
+            </svg>
+            Simulador de Sensibilidad de Demanda (Ciencia de Datos)
+          </h3>
+          <p style="font-size: 0.85rem; color: #cbd5e1; margin-top: 0.2rem;">
+            Proyecta el impacto teórico de variaciones cambiarias en el consumo y la migración entre calidades de
+            combustible.
+          </p>
+        </div>
+        <span class="simulator-badge">Modelo Demostrativo de Elasticidad</span>
+      </div>
+
+      <div class="simulator-body">
+        <div class="simulator-controls">
+          <div class="control-item">
+            <div class="control-label-wrapper">
+              <span class="control-label">Variación Simulada del Dólar USD/ARS:</span>
+              <span id="simSliderUsdVal" class="control-value">+0%</span>
+            </div>
+            <input id="simSliderUsd" type="range" class="slider-range" min="-30" max="100" step="5" value="0">
+            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted);">
+              <span>-30% (Apreciación)</span>
+              <span>0% (Actual)</span>
+              <span>+100% (Devaluación)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="simulator-results">
+          <div class="sim-result-row">
+            <span class="sim-result-label">Tipo de Cambio Simulado:</span>
+            <span id="simUsdResult" class="sim-result-value">-</span>
+          </div>
+          <div class="sim-result-row">
+            <span class="sim-result-label">Consumo Mensual Estimado:</span>
+            <span id="simConsumoResult" class="sim-result-value">-</span>
+          </div>
+          <div class="sim-result-row">
+            <span class="sim-result-label">Variación en Demanda:</span>
+            <span id="simVarConsumoResult" class="sim-result-value">-</span>
+          </div>
+          <div class="sim-result-row">
+            <span class="sim-result-label">Sustitución Estimada (Súper vs Premium):</span>
+            <span id="simSustitucionResult" class="sim-result-value" style="font-size:0.95rem; color:#a5b4fc;">-</span>
+          </div>
+          <p class="sim-disclaimer">
+            * Estimación calculada a partir del coeficiente de elasticidad empírica observada en los shocks cambiarios
+            de 2018, 2019 y 2023.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabla Exploratoria de Datos -->
+    <section class="table-section" aria-label="Explorador de Datos">
+      <div class="table-header-bar">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 600;">Explorador Mensual de Registros</h3>
+          <p style="font-size: 0.825rem; color: var(--text-secondary);">Consulta detallada de registros consolidados</p>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input id="tableSearchInput" type="text" class="search-input"
+              placeholder="Buscar por año o mes (ej. 2020)...">
+          </div>
+          <button id="btnExportCsv" class="btn-secondary" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Descargar CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Período</th>
+              <th>Nafta Súper (m³)</th>
+              <th>Nafta Premium (m³)</th>
+              <th>Gasoil (m³)</th>
+              <th>Total Líquidos (m³)</th>
+              <th>USD ($)</th>
+              <th>Precio Súper ($)</th>
+              <th>Precio Súper (US$)</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <!-- Renderizado dinámico vía JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-pagination">
+        <span id="tablePageInfo">Cargando registros...</span>
+        <div class="pagination-controls">
+          <button id="btnTablePrev" class="btn-secondary" type="button">Anterior</button>
+          <button id="btnTableNext" class="btn-secondary" type="button">Siguiente</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer Académico y Fuentes -->
+    <footer class="footer-bar">
+      <div class="footer-credits">
+        <strong>Grupo 4</strong> • Práctica Profesionalizante II (TSCDeIA) • Despliegue optimizado para
+        <strong>Vercel</strong>
+      </div>
+      <div>
+        Fuentes: Secretaría de Energía de la Nación • Registros Históricos USD/ARS
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Carga de Datos consolidada de respaldo para entorno local file:// -->
+  <script src="js/data.js"></script>
+  <!-- Módulos de la Aplicación -->
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+
+</html>
