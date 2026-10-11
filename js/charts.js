@@ -28,7 +28,66 @@ const ChartManager = (function() {
     gridColor: 'rgba(255, 255, 255, 0.06)',
     textColor: '#94a3b8'
   };
+// Plugin reutilizable para dibujar los 8 hitos cambiarios como líneas verticales
+const createMilestonesPlugin = (records) => ({
+    id: 'milestonesPlugin',
+    afterDraw(chart) {
+        const { ctx, chartArea, scales: { x } } = chart;
+        if (!x || !records || !chartArea) return;
 
+        // 4 niveles de altura para que los hitos cercanos no se superpongan
+        const yOffsets = [14, 30, 46, 62];
+        let hitoIndex = 0;
+
+        records.forEach((r, index) => {
+            if (r.hito) {
+                const xPos = x.getPixelForValue(index);
+                if (xPos >= chartArea.left && xPos <= chartArea.right) {
+                    ctx.save();
+
+                    // 1. Línea vertical punteada
+                    ctx.beginPath();
+                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = 'rgba(239, 68, 68, 0.65)';
+                    ctx.lineWidth = 1.5;
+                    ctx.moveTo(xPos, chartArea.top);
+                    ctx.lineTo(xPos, chartArea.bottom);
+                    ctx.stroke();
+
+                    // 2. Altura escalonada del hito actual
+                    const yPos = chartArea.top + yOffsets[hitoIndex % yOffsets.length];
+                    const labelText = '📍 ' + (r.hito.length > 20 ? r.hito.substring(0, 18) + '...' : r.hito);
+
+                    ctx.font = 'bold 9px Inter, sans-serif';
+                    const textWidth = ctx.measureText(labelText).width;
+                    const paddingX = 6;
+                    const badgeHeight = 16;
+
+                    // 3. Cápsula de fondo oscuro para evitar que las líneas ensucien el texto
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+                    if (ctx.roundRect) {
+                        ctx.beginPath();
+                        ctx.roundRect(xPos - textWidth / 2 - paddingX, yPos - 11, textWidth + paddingX * 2, badgeHeight, 4);
+                        ctx.fill();
+                    } else {
+                        ctx.fillRect(xPos - textWidth / 2 - paddingX, yPos - 11, textWidth + paddingX * 2, badgeHeight);
+                    }
+                    ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // 4. Texto del hito
+                    ctx.fillStyle = '#fca5a5';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(labelText, xPos, yPos);
+
+                    ctx.restore();
+                    hitoIndex++;
+                }
+            }
+        });
+    }
+});
   // Configuración global por defecto de Chart.js
   if (window.Chart) {
     Chart.defaults.color = COLORS.textColor;
@@ -158,7 +217,8 @@ const ChartManager = (function() {
             }
           }
         }
-      }
+      },
+      plugins: [createMilestonesPlugin(records)] 
     });
   }
 
@@ -245,7 +305,8 @@ const ChartManager = (function() {
             ticks: { callback: val => `$ ${val}` }
           }
         }
-      }
+      },
+      plugins: [createMilestonesPlugin(records)] 
     });
   }
 
@@ -316,7 +377,8 @@ const ChartManager = (function() {
             title: { display: true, text: 'Cuota de Mercado (%)' }
           }
         }
-      }
+      },
+      plugins: [createMilestonesPlugin(records)]
     });
   }
 

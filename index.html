@@ -82,7 +82,7 @@
       <!-- KPI 1: Consumo Total Líquidos -->
       <article class="kpi-card kpi-total">
         <div class="kpi-header">
-          <span class="kpi-title">Consumo Acumulado Período</span>
+          <span class="kpi-title">Consumo Total Acumulado (2017-2025)</span>
           <div class="kpi-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -95,7 +95,7 @@
         </div>
         <div class="kpi-footer">
           <span id="kpiTotalPill" class="kpi-pill neutral">-</span>
-          <span>en combustibles líquidos</span>
+          <span>(punta a punta: Ago 2025 vs. Ene 2017)</span> 
         </div>
       </article>
 
@@ -219,6 +219,11 @@
             <button id="btnPriceUsd" class="chart-btn" type="button">USD (US$)</button>
           </div>
         </div>
+        <!-- Aviso metodológico de corte de serie -->
+    <div style="margin: 0 16px 12px 16px; padding: 6px 12px; background: rgba(245, 158, 11, 0.12); border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.8rem; color: #fcd34d;">
+        ⚠️ <strong>Discontinuidad de serie:</strong> Datos abiertos municipales disponibles hasta <strong>Mar 2022</strong> (Premium), <strong>Mar 2023</strong> (Gasoil) y <strong>Nov 2023</strong> (Súper).
+    </div>
+    
         <div class="chart-canvas-container">
           <canvas id="pricesChart"></canvas>
         </div>
@@ -349,9 +354,14 @@
         <strong>Grupo 4</strong> • Práctica Profesionalizante II (TSCDeIA) • Despliegue optimizado para
         <strong>Vercel</strong>
       </div>
-      <div>
-        Fuentes: Secretaría de Energía de la Nación • Registros Históricos USD/ARS
-      </div>
+      <div class="footer-sources">
+        <div>
+            <strong>Fuentes oficiales:</strong> Precios y Consumo: Portal de Datos Abiertos de la Municipalidad de la Ciudad de Corrientes (2017–2025) • Tipo de Cambio USD/ARS: Banco Central de la República Argentina (BCRA).
+        </div>
+        <div style="margin-top: 4px; font-size: 0.85em; opacity: 0.85;">
+            <strong>Nota metodológica:</strong> Se excluye de las series el Gas Licuado de Petróleo Automotor (GLPA) por representar un volumen marginal y discontinuo en la plaza local.
+        </div>
+    </div>
     </footer>
 
   </div>
