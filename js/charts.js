@@ -8,6 +8,7 @@ const ChartManager = (function() {
   let usdVsConsumptionChartInstance = null;
   let substitutionChartInstance = null;
   let pricesChartInstance = null;
+  let spendChartInstance = null;
   
   // Estado local de opciones de visualización
   let consumptionMode = 'lines'; // 'lines' o 'stacked'
@@ -387,10 +388,8 @@ const createMilestonesPlugin = (records) => ({
     const ctx = document.getElementById('pricesChart')?.getContext('2d');
     if (!ctx) return;
 
-    // Filtrar solo registros donde exista al menos un precio
-    const validRecords = records.filter(r => 
-      r.precio_gasoil_ars !== null || r.precio_nafta_super_ars !== null || r.precio_nafta_premium_ars !== null
-    );
+    // Se muestran todos los meses del período: donde no hay precio la línea queda cortada (hueco visible)
+    const validRecords = records;
 
     const labels = validRecords.map(r => r.etiqueta);
     const isUsd = priceCurrency === 'usd';
@@ -398,6 +397,13 @@ const createMilestonesPlugin = (records) => ({
     const gasoilData = validRecords.map(r => isUsd ? r.precio_gasoil_usd : r.precio_gasoil_ars);
     const superData = validRecords.map(r => isUsd ? r.precio_nafta_super_usd : r.precio_nafta_super_ars);
     const premiumData = validRecords.map(r => isUsd ? r.precio_nafta_premium_usd : r.precio_nafta_premium_ars);
+
+    // Resalta con un punto el último mes con dato real de cada combustible; el resto de la línea sin puntos
+    const lastPointRadius = (data) => {
+      let last = -1;
+      data.forEach((v, i) => { if (v != null) last = i; });
+      return (c) => (c.dataIndex === last ? 6 : 0);
+    };
 
     if (pricesChartInstance) {
       pricesChartInstance.destroy();
@@ -414,7 +420,7 @@ const createMilestonesPlugin = (records) => ({
             borderColor: COLORS.super,
             tension: 0.25,
             borderWidth: 2,
-            pointRadius: validRecords.length > 50 ? 0 : 2
+            pointRadius: lastPointRadius(superData)
           },
           {
             label: 'Nafta Premium',
@@ -422,7 +428,7 @@ const createMilestonesPlugin = (records) => ({
             borderColor: COLORS.premium,
             tension: 0.25,
             borderWidth: 2,
-            pointRadius: validRecords.length > 50 ? 0 : 2
+            pointRadius: lastPointRadius(premiumData)
           },
           {
             label: 'Gasoil',
@@ -430,7 +436,7 @@ const createMilestonesPlugin = (records) => ({
             borderColor: COLORS.gasoil,
             tension: 0.25,
             borderWidth: 2,
-            pointRadius: validRecords.length > 50 ? 0 : 2
+            pointRadius: lastPointRadius(gasoilData)
           }
         ]
       },
@@ -462,7 +468,73 @@ const createMilestonesPlugin = (records) => ({
             title: { display: true, text: isUsd ? 'Precio estimado (USD/litro)' : 'Precio surtidor (ARS/litro)' }
           }
         }
-      }
+      },
+      plugins: [createMilestonesPlugin(validRecords)]
+    });
+  }
+
+  // Gasto mensual en dólares (millones de US$): volumen (m³ → litros) × precio en US$ del mes
+  function spendMillionsUsd(volumen, precioUsd) {
+    if (volumen == null || precioUsd == null) return null;
+    return (volumen * 1000 * precioUsd) / 1e6;
+  }
+
+  function renderSpendChart(records) {
+    const ctx = document.getElementById('spendChart')?.getContext('2d');
+    if (!ctx) return;
+
+    const labels = records.map(r => r.etiqueta);
+    const superData = records.map(r => spendMillionsUsd(r.volumen_nafta_super, r.precio_nafta_super_usd));
+    const premiumData = records.map(r => spendMillionsUsd(r.volumen_nafta_premium, r.precio_nafta_premium_usd));
+    const gasoilData = records.map(r => spendMillionsUsd(r.volumen_gasoil, r.precio_gasoil_usd));
+    // El total sólo existe cuando los tres combustibles tienen precio (evita subestimarlo)
+    const totalData = records.map((r, i) =>
+      superData[i] != null && premiumData[i] != null && gasoilData[i] != null
+        ? superData[i] + premiumData[i] + gasoilData[i]
+        : null
+    );
+
+    if (spendChartInstance) {
+      spendChartInstance.destroy();
+    }
+
+    const line = (label, data, color, width = 2) => ({
+      label, data, borderColor: color, tension: 0.25, borderWidth: width, pointRadius: 0
+    });
+
+    spendChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          line('Total (3 combustibles)', totalData, COLORS.total, 3),
+          line('Nafta Súper', superData, COLORS.super),
+          line('Nafta Premium', premiumData, COLORS.premium),
+          line('Gasoil', gasoilData, COLORS.gasoil)
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${formatNumber(ctx.raw, 2, 'US$ ', ' M')}`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { color: COLORS.gridColor }, ticks: { maxTicksLimit: 12 } },
+          y: {
+            grid: { color: COLORS.gridColor },
+            ticks: { callback: val => `US$ ${val} M` },
+            title: { display: true, text: 'Gasto mensual (millones de US$)' }
+          }
+        }
+      },
+      plugins: [createMilestonesPlugin(records)]
     });
   }
 
@@ -482,6 +554,7 @@ const createMilestonesPlugin = (records) => ({
     renderUsdVsConsumptionChart(records);
     renderSubstitutionChart(records);
     renderPricesChart(records);
+    renderSpendChart(records);
   }
 
   return {

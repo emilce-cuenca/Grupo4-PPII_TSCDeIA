@@ -780,3 +780,108 @@ body {
     font-size: 1.5rem;
   }
 }
+
+/* Indicador de cobertura de precio y notas de gráficos */
+.chart-note {
+  margin: 8px 16px 0 16px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.coverage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 0.5rem 1rem 0.5rem 1rem;
+}
+
+.coverage-row-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.coverage-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.coverage-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.coverage-last {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* Simulador: selector de modelo, coeficiente publicado, método y aviso de extrapolación */
+.sim-model-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.75rem;
+}
+
+.sim-coef-card {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sim-coef-headline {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sim-coef-detail {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.sim-warning {
+  margin-top: 0.75rem;
+  padding: 6px 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border-left: 3px solid #f59e0b;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #fcd34d;
+}
+
+.sim-method {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sim-method h4 {
+  font-size: 0.95rem;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.sim-method ul {
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.sim-method code {
+  font-size: 0.78rem;
+  color: #a5b4fc;
+}

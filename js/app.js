@@ -14,9 +14,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   let tableCurrentPage = 1;
   const rowsPerPage = 10;
 
-  // Elasticidad empírica calculada para simulación (sensibilidad ante saltos del dólar)
-  const ELASTICIDAD_DEMANDA = -0.085; // Un aumento del 10% en el dólar históricamente deprime un ~0.85% el consumo inmediato antes de reacomodarse
-
   // 1. Cargar Datos (fetch con fallback a window.FUEL_DATA)
   async function loadData() {
     try {
@@ -147,6 +144,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     updateKpis();
+    updateCoverage();
     ChartManager.updateAllCharts(currentFilteredRecords, selectedFuel);
     tableCurrentPage = 1;
     renderTable();
@@ -178,9 +176,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (kpiTotalEl) {
       kpiTotalEl.textContent = formatCompact(totalConsumoPeriodo);
     }
+    const kpiTotalTitleEl = document.getElementById('kpiTotalTitle');
+    const kpiTotalRangeEl = document.getElementById('kpiTotalRange');
+    if (kpiTotalTitleEl) {
+      kpiTotalTitleEl.textContent = `Consumo Total Acumulado (${primerRegistro.anio}-${ultimoRegistro.anio})`;
+    }
+    if (kpiTotalRangeEl) {
+      kpiTotalRangeEl.textContent = `(${ultimoRegistro.etiqueta} vs. ${primerRegistro.etiqueta})`;
+    }
     if (kpiTotalPillEl) {
       kpiTotalPillEl.className = `kpi-pill ${varConsumoPct >= 0 ? 'positive' : 'negative'}`;
-      kpiTotalPillEl.textContent = `${varConsumoPct >= 0 ? '+' : ''}${varConsumoPct.toFixed(1)}% vs inicio`;
+      kpiTotalPillEl.textContent = `${varConsumoPct >= 0 ? '+' : ''}${varConsumoPct.toFixed(1)}% último vs primer mes`;
     }
 
     // KPI Nafta Súper
@@ -215,41 +221,241 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 5. Simulador Interactivo de Demanda (Elasticidad Demostrativa)
+  // 4b. Cobertura de precio por combustible (meses con dato ÷ meses del período)
+  function updateCoverage() {
+    const list = document.getElementById('coverageList');
+    if (!list || !currentFilteredRecords.length) return;
+
+    const total = currentFilteredRecords.length;
+    const fuels = [
+      { label: 'Nafta Súper', key: 'precio_nafta_super_ars', color: '#10b981' },
+      { label: 'Nafta Premium', key: 'precio_nafta_premium_ars', color: '#a855f7' },
+      { label: 'Gasoil', key: 'precio_gasoil_ars', color: '#f59e0b' }
+    ];
+
+    const subtitle = document.getElementById('coverageSubtitle');
+    if (subtitle) subtitle.textContent = `Meses con precio sobre ${total} meses del período`;
+
+    list.innerHTML = fuels.map(f => {
+      const withPrice = currentFilteredRecords.filter(r => r[f.key] != null);
+      const pct = (withPrice.length / total) * 100;
+      const last = withPrice.length ? withPrice[withPrice.length - 1].etiqueta : 'sin datos en el período';
+      return `
+        <div>
+          <div class="coverage-row-head">
+            <strong>${f.label}</strong>
+            <span>${pct.toFixed(0)}% (${withPrice.length}/${total})</span>
+          </div>
+          <div class="coverage-bar"><div class="coverage-bar-fill" style="width:${pct}%; background:${f.color};"></div></div>
+          <div class="coverage-last">Último precio: ${last}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // 5. Simulador de Sensibilidad de Demanda
+  // Modelo: elasticidad. Línea recta entre los cambios relativos (logaritmos) del consumo y del dólar,
+  // ambos contra el mismo mes del año anterior:
+  //   ln(consumo_t / consumo_t-12) = α + β · ln(dólar_t / dólar_t-12)
+  // β es la elasticidad: si el dólar sube 1%, el consumo cambia β%.
+  const SIM_MODELS = {
+    sinCovid: { label: 'Interanual sin 2020–21', excludedYears: [2020, 2021] },
+    todos: { label: 'Interanual con todos los datos', excludedYears: [] }
+  };
+  // Hitos cambiarios usados para medir la sustitución (se excluyen los hitos de COVID y de precios)
+  const SHOCKS_CAMBIARIOS = ['2018-05', '2018-08', '2019-08', '2022-07', '2023-12'];
+  const SHOCK_HORIZON = 3; // meses posteriores al shock
+
+  const usdOf = r => r.usd_promedio || r.usd_ultimo;
+
+  function estimateElasticity(data, excludedYears) {
+    const pairs = [];
+    for (let t = 12; t < data.length; t++) {
+      const prev = data[t - 12];
+      const curr = data[t];
+      if (!prev.total_consumo || !curr.total_consumo || !usdOf(prev) || !usdOf(curr)) continue;
+      if (excludedYears.includes(prev.anio) || excludedYears.includes(curr.anio)) continue;
+      pairs.push({
+        x: Math.log(usdOf(curr) / usdOf(prev)),
+        y: Math.log(curr.total_consumo / prev.total_consumo)
+      });
+    }
+
+    const n = pairs.length;
+    const meanX = pairs.reduce((s, p) => s + p.x, 0) / n;
+    const meanY = pairs.reduce((s, p) => s + p.y, 0) / n;
+    let sxx = 0, sxy = 0, syy = 0;
+    pairs.forEach(p => {
+      sxx += (p.x - meanX) ** 2;
+      sxy += (p.x - meanX) * (p.y - meanY);
+      syy += (p.y - meanY) ** 2;
+    });
+    const beta = sxy / sxx;
+    const alpha = meanY - beta * meanX;
+
+    // Error estándar simple de β (algo optimista: los meses consecutivos se parecen entre sí)
+    const residuals = pairs.reduce((s, p) => s + (p.y - alpha - beta * p.x) ** 2, 0);
+    const se = Math.sqrt(residuals / (n - 2) / sxx);
+
+    return {
+      beta,
+      alpha,
+      se,
+      ciLow: beta - 1.96 * se,
+      ciHigh: beta + 1.96 * se,
+      r2: (sxy * sxy) / (sxx * syy),
+      n,
+      minUsdPct: (Math.exp(Math.min(...pairs.map(p => p.x))) - 1) * 100,
+      maxUsdPct: (Math.exp(Math.max(...pairs.map(p => p.x))) - 1) * 100
+    };
+  }
+
+  // Cambio de cuota de Premium (puntos porcentuales) entre el mes previo al shock y SHOCK_HORIZON meses después
+  function estimateSubstitution(data) {
+    const rows = SHOCKS_CAMBIARIOS.map(periodo => {
+      const i = data.findIndex(r => r.periodo === periodo);
+      if (i < 1 || i + SHOCK_HORIZON >= data.length) return null;
+      const before = data[i - 1];
+      const after = data[i + SHOCK_HORIZON];
+      const usdPct = (usdOf(after) / usdOf(before) - 1) * 100;
+      const premiumPp = after.share_nafta_premium - before.share_nafta_premium;
+      return {
+        periodo,
+        hito: data[i].hito,
+        desde: before.etiqueta,
+        hasta: after.etiqueta,
+        usdPct,
+        premiumPp,
+        ppPer10: (premiumPp / usdPct) * 10
+      };
+    }).filter(Boolean);
+
+    const ratios = rows.map(r => r.ppPer10);
+    return {
+      rows,
+      meanPer10: ratios.reduce((s, v) => s + v, 0) / ratios.length,
+      minPer10: Math.min(...ratios),
+      maxPer10: Math.max(...ratios)
+    };
+  }
+
   function initSimulator() {
-    const sliderUsd = document.getElementById('simSliderUsd');
-    const sliderUsdLabel = document.getElementById('simSliderUsdVal');
-    const baseRecord = fullDataset.data[fullDataset.data.length - 1]; // Último registro disponible
+    const slider = document.getElementById('simSliderUsd');
+    const sliderLabel = document.getElementById('simSliderUsdVal');
+    if (!slider) return;
+
+    const data = fullDataset.data;
+    const estimates = {
+      sinCovid: estimateElasticity(data, SIM_MODELS.sinCovid.excludedYears),
+      todos: estimateElasticity(data, SIM_MODELS.todos.excludedYears)
+    };
+    const substitution = estimateSubstitution(data);
+    let activeModel = 'sinCovid';
+
+    // Base: promedio de los últimos 12 meses (evita depender de la estacionalidad de un único mes)
+    const last12 = data.slice(-12);
+    const avg = key => last12.reduce((s, r) => s + (r[key] || 0), 0) / last12.length;
+    const base = {
+      consumo: avg('total_consumo'),
+      sharePremium: avg('share_nafta_premium'),
+      shareSuper: avg('share_nafta_super'),
+      usd: usdOf(data[data.length - 1]),
+      desde: last12[0].etiqueta,
+      hasta: last12[last12.length - 1].etiqueta
+    };
+
+    const fmt = (v, d = 1) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const signed = (v, d = 1) => `${v >= 0 ? '+' : ''}${fmt(v, d)}`;
+    // Efecto del modelo: consumo estimado / consumo base = (1 + Δ% dólar)^β
+    const effectPct = (beta, usdPct) => (Math.pow(1 + usdPct / 100, beta) - 1) * 100;
+
+    function renderCoefficient() {
+      const e = estimates[activeModel];
+      const per10 = effectPct(e.beta, 10);
+      const per10Low = effectPct(e.ciHigh, 10);
+      const per10High = effectPct(e.ciLow, 10);
+      document.getElementById('simCoefHeadline').textContent =
+        `Por cada 10% de devaluación interanual, el consumo ${per10 < 0 ? 'cae' : 'sube'} ${fmt(Math.abs(per10), 2)}%`;
+      document.getElementById('simCoefDetail').textContent =
+        `Elasticidad β = ${fmt(e.beta, 3)} (IC 95%: ${fmt(e.ciLow, 3)} a ${fmt(e.ciHigh, 3)}) · ` +
+        `efecto por 10%: entre ${fmt(per10High, 2)}% y ${fmt(per10Low, 2)}% · R² = ${fmt(e.r2, 2)} · ` +
+        `n = ${e.n} comparaciones interanuales`;
+      document.getElementById('simCoefMethod').textContent = activeModel === 'sinCovid'
+        ? 'Modelo principal. Se excluyen las comparaciones en las que alguno de los dos meses cae en 2020 o 2021, porque el aislamiento por COVID y el rebote posterior no responden al tipo de cambio.'
+        : 'Modelo de comparación. Incluye 2020–21: el shock de COVID agrega variación en el consumo que no tiene que ver con el dólar, por eso el ajuste (R²) es mucho menor.';
+      document.getElementById('simRangeInfo').textContent =
+        `Rango observado de variación interanual del dólar: ${signed(e.minUsdPct, 0)}% a ${signed(e.maxUsdPct, 0)}%`;
+    }
 
     function runSimulation() {
-      const varUsdPct = parseFloat(sliderUsd.value);
-      sliderUsdLabel.textContent = `${varUsdPct >= 0 ? '+' : ''}${varUsdPct}%`;
+      const e = estimates[activeModel];
+      const usdPct = parseFloat(slider.value);
+      sliderLabel.textContent = `${signed(usdPct, 0)}%`;
 
-      const usdSimulado = baseRecord.usd_ultimo * (1 + (varUsdPct / 100));
-      // Cambio porcentual estimado en consumo: elasticidad * cambio % usd
-      const deltaConsumoPct = varUsdPct * ELASTICIDAD_DEMANDA;
-      const consumoSimulado = baseRecord.total_consumo * (1 + (deltaConsumoPct / 100));
-      const deltaVolumenM3 = consumoSimulado - baseRecord.total_consumo;
+      const deltaPct = effectPct(e.beta, usdPct);
+      const deltaLow = effectPct(e.ciHigh, usdPct);
+      const deltaHigh = effectPct(e.ciLow, usdPct);
+      const consumoSim = base.consumo * (1 + deltaPct / 100);
+      const deltaM3 = consumoSim - base.consumo;
 
-      // Efecto sustitución: ante saltos del dólar, un porcentaje de usuarios premium pasa a súper
-      let factorSustitucion = Math.max(0, varUsdPct * 0.05); // Ej: +20% en dólar traslada un 1% de participación
-      let simShareSuper = Math.min(65, baseRecord.share_nafta_super + factorSustitucion);
-      let simSharePremium = Math.max(10, baseRecord.share_nafta_premium - factorSustitucion);
+      // Sustitución simétrica: el mismo coeficiente aplica si el dólar sube o baja
+      const premiumShift = substitution.meanPer10 * usdPct / 10;
+      const simPremium = base.sharePremium + premiumShift;
+      const simSuper = base.shareSuper - premiumShift;
 
-      document.getElementById('simUsdResult').textContent = `$ ${usdSimulado.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-      document.getElementById('simConsumoResult').textContent = `${consumoSimulado.toLocaleString('es-AR', { maximumFractionDigits: 0 })} m³`;
-      
-      const varConsumoEl = document.getElementById('simVarConsumoResult');
-      varConsumoEl.textContent = `${deltaConsumoPct >= 0 ? '+' : ''}${deltaConsumoPct.toFixed(2)}% (${deltaVolumenM3 >= 0 ? '+' : ''}${Math.round(deltaVolumenM3).toLocaleString('es-AR')} m³)`;
-      varConsumoEl.style.color = deltaConsumoPct < 0 ? '#f43f5e' : '#10b981';
+      document.getElementById('simUsdResult').textContent = `$ ${fmt(base.usd * (1 + usdPct / 100), 0)}`;
+      document.getElementById('simBaseResult').textContent = `${fmt(base.consumo, 0)} m³`;
+      document.getElementById('simConsumoResult').textContent = `${fmt(consumoSim, 0)} m³`;
 
-      document.getElementById('simSustitucionResult').textContent = `Súper: ${simShareSuper.toFixed(1)}% | Premium: ${simSharePremium.toFixed(1)}%`;
+      const varEl = document.getElementById('simVarConsumoResult');
+      varEl.textContent = `${signed(deltaPct, 2)}% (${signed(deltaM3, 0)} m³)`;
+      varEl.style.color = deltaPct < 0 ? '#f43f5e' : '#10b981';
+      document.getElementById('simVarRangeResult').textContent =
+        `IC 95%: ${signed(Math.min(deltaLow, deltaHigh), 2)}% a ${signed(Math.max(deltaLow, deltaHigh), 2)}%`;
+
+      document.getElementById('simSustitucionResult').textContent =
+        `Súper: ${fmt(simSuper)}% | Premium: ${fmt(simPremium)}% (${signed(premiumShift, 2)} pp)`;
+
+      const warning = document.getElementById('simRangeWarning');
+      const outOfRange = usdPct < e.minUsdPct || usdPct > e.maxUsdPct;
+      warning.hidden = !outOfRange;
+      if (outOfRange) {
+        warning.textContent = `⚠️ ${signed(usdPct, 0)}% está fuera del rango observado en los datos ` +
+          `(${signed(e.minUsdPct, 0)}% a ${signed(e.maxUsdPct, 0)}%). El resultado es una extrapolación del modelo.`;
+      }
     }
 
-    if (sliderUsd) {
-      sliderUsd.addEventListener('input', runSimulation);
-      runSimulation();
+    function renderSubstitutionTable() {
+      document.getElementById('simShockBody').innerHTML = substitution.rows.map(r => `
+        <tr>
+          <td><strong>${r.hito}</strong><br><span style="color: var(--text-muted); font-size: 0.75rem;">${r.desde} → ${r.hasta}</span></td>
+          <td>${signed(r.usdPct)}%</td>
+          <td style="color: ${r.premiumPp < 0 ? '#f43f5e' : '#10b981'};">${signed(r.premiumPp, 2)} pp</td>
+          <td>${signed(r.ppPer10, 2)} pp</td>
+        </tr>`).join('');
+      document.getElementById('simShockSummary').textContent =
+        `Promedio usado en el simulador: ${signed(substitution.meanPer10, 2)} pp de cuota Premium por cada 10% de devaluación ` +
+        `(rango entre shocks: ${signed(substitution.minPer10, 2)} a ${signed(substitution.maxPer10, 2)} pp). ` +
+        `Los shocks no muestran un efecto consistente (el signo cambia entre episodios), así que este coeficiente es muy incierto.`;
     }
+
+    document.getElementById('simBaseInfo').textContent =
+      `Base: promedio mensual ${base.desde} – ${base.hasta} · cuotas Súper ${fmt(base.shareSuper)}% / Premium ${fmt(base.sharePremium)}%`;
+
+    const modelButtons = document.querySelectorAll('.sim-model-btn');
+    modelButtons.forEach(btn => {
+      btn.addEventListener('click', e => {
+        modelButtons.forEach(b => b.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        activeModel = e.currentTarget.dataset.model;
+        renderCoefficient();
+        runSimulation();
+      });
+    });
+
+    slider.addEventListener('input', runSimulation);
+    renderCoefficient();
+    renderSubstitutionTable();
+    runSimulation();
   }
 
   // 6. Renderizado de Tabla Exploratoria con Búsqueda y Paginación

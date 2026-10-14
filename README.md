@@ -2,7 +2,7 @@
 ### Grupo 4 • Práctica Profesionalizante II (PPII)
 **Tecnicatura Superior en Ciencia de Datos e Inteligencia Artificial**
 
-Este proyecto es una aplicación web interactiva (Frontend SPA sin backend) para la visualización, exploración y análisis del consumo de combustibles líquidos en Argentina, su relación con los precios en surtidor y la evolución del tipo de cambio oficial USD/ARS entre 2017 y 2025.
+Este proyecto es una aplicación web interactiva (Frontend SPA sin backend) para la visualización, exploración y análisis del consumo de combustibles líquidos en la **Ciudad de Corrientes**, su relación con los precios en surtidor y la evolución del tipo de cambio USD/ARS (variable nacional) entre 2017 y 2025.
 
 > **Nota Metodológica:** Por especificación de los requerimientos, **el combustible GLPA fue completamente excluido** del análisis, de las métricas y de los cálculos de consumo total. El universo de análisis se enfoca en los combustibles líquidos automotores: **Nafta Súper**, **Nafta Premium** y **Gasoil**.
 
@@ -22,7 +22,9 @@ Este proyecto es una aplicación web interactiva (Frontend SPA sin backend) para
    - **Precios en Surtidor:** Evolución de precios por litro en estaciones de servicio, con selector para alternar entre pesos argentinos ($) y dólares (US$).
 
 3. **Simulador de Sensibilidad de Demanda (Data Science Demo):**
-   - Control interactivo para proyectar escenarios de variación cambiaria (-30% a +100%) y observar el impacto estimado en el consumo y la sustitución de combustibles basándose en la elasticidad empírica observada.
+   - Publica la elasticidad consumo-dólar estimada con los datos (con intervalo de confianza, R² y n), con dos modelos en solapas: interanual sin 2020–21 (principal) e interanual con todos los datos.
+   - Slider de variación interanual del dólar (-30% a +350%) que estima el consumo mensual y la sustitución Premium → Súper, y avisa cuando el valor sale del rango observado.
+   - Tabla de sustitución observada en los cinco shocks cambiarios catalogados.
 
 4. **Explorador Tabular y Exportación:**
    - Tabla paginada con buscador en tiempo real por mes o año.
@@ -53,6 +55,65 @@ Grupo4-PPII_TSCDeIA/
 ├── vercel.json                 # Configuración de rutas y cabeceras de caché para Vercel
 └── README.md                   # Documentación del proyecto
 ```
+
+---
+
+## Fuentes de Datos
+
+| Variable | Fuente | Alcance |
+|---|---|---|
+| Consumo de combustibles (m³) | Portal de Datos Abiertos de la Municipalidad de Corrientes | Ciudad de Corrientes, mensual |
+| Precios en surtidor ($/litro) | Portal de Datos Abiertos de la Municipalidad de Corrientes | Ciudad de Corrientes, mensual |
+| Tipo de cambio USD/ARS | [Investing.com – Datos históricos USD/ARS](https://es.investing.com/currencies/usd-ars-historical-data) | Nacional, mensual |
+
+> El tipo de cambio es una variable **nacional** comparada contra un consumo **local**. El dashboard muestra una **asociación** entre ambas series, no una relación causal: en el consumo de una ciudad también influyen la estacionalidad, la actividad económica local y el parque automotor.
+
+---
+
+## Metodología
+
+El script [`scripts/preprocess_data.py`](scripts/preprocess_data.py) transforma los tres CSV de `datasets/` en `data/fuel_economic_data.json` (y su copia `js/data.js` para uso offline):
+
+1. **Normalización de números y fechas:** se convierte el formato argentino (`1.189,00`, `$ 15,91`, `0,27%`) a `float` y todas las fechas a la clave mensual `YYYY-MM`.
+2. **Exclusión de GLPA:** por especificación de los requerimientos, el GLPA se descarta de consumo y precios. El total de consumo se **recalcula** como `gasoil + nafta súper + nafta premium` (no se usa `total_general`).
+3. **Cuotas de mercado:** `share_X = volumen_X / total_consumo × 100`; `ratio_premium_super = nafta_premium / nafta_súper`.
+4. **Precios en dólares:** `precio_USD = precio_ARS / usd_promedio` del mes (si no hay promedio, se usa el último valor del mes).
+5. **Unión por mes:** consumo, dólar y precios se unen por `YYYY-MM`. Un mes sin dato en una fuente queda en `null`.
+6. **Hitos:** meses con eventos relevantes (crisis cambiarias, COVID, etc.) se marcan en el campo `hito` y se dibujan como líneas verticales en los gráficos.
+
+**Indicadores del tablero**
+- *Consumo Total Acumulado:* suma del consumo de los meses del período seleccionado. El porcentaje que lo acompaña es la variación entre el **último y el primer mes** del período, no el crecimiento del acumulado.
+- *Cobertura de precio:* para cada combustible, `meses con precio ÷ meses del período seleccionado`. Se calcula en el navegador a partir del JSON.
+- *Gasto en combustible en dólares:* `volumen (m³) × 1000 × precio_USD` por mes, en millones de US$, donde `precio_USD = precio_ARS ÷ USD/ARS del mes`. Sólo se calcula en los meses con precio; el total suma los tres combustibles y existe hasta Feb 2023, último mes en que los tres tienen precio.
+
+**Simulador de sensibilidad (calculado en el navegador, `js/app.js`)**
+- *Elasticidad β:* para cada mes se calcula el cambio relativo del dólar y del consumo respecto del mismo mes del año anterior (en logaritmos, para que los cambios relativos pesen igual), y se ajusta una recta por mínimos cuadrados: `ln(consumo_t / consumo_t-12) = α + β · ln(dólar_t / dólar_t-12)`. β se lee así: si el dólar sube 1%, el consumo cambia β%. El intervalo de confianza usa el error estándar simple de β, que es algo optimista porque las comparaciones interanuales se solapan.
+  - *Modelo principal:* excluye las comparaciones en las que alguno de los dos meses cae en 2020 o 2021 (COVID). Resultado actual: β = -0,262 (IC 95%: -0,323 a -0,201), R² = 0,57, n = 56. Por cada 10% de devaluación interanual, el consumo cae ~2,5%.
+  - *Modelo de comparación:* todos los datos. β = -0,303 (IC 95%: -0,428 a -0,178), R² = 0,20, n = 92.
+  - *Por qué logaritmos:* en una prueba con los datos, tuvo menos error que el modelo lineal (≈8,0 vs ≈8,6 puntos porcentuales dentro de la muestra, y ≈8,4 vs ≈9,0 dejando un año afuera). La mejora es chica.
+- *Variación en demanda:* `consumo estimado = consumo base × (1 + Δ% dólar)^β`, con consumo base = promedio mensual de los últimos 12 meses. Es un **efecto aislado, no un pronóstico**: no incluye la tendencia general (α) y el error típico del modelo es de ~8 puntos porcentuales de variación del consumo.
+- *Sustitución:* para cada hito cambiario (2018-05, 2018-08, 2019-08, 2022-07, 2023-12) se mide el cambio de la cuota de Premium entre el mes previo y tres meses después, dividido por la variación del dólar en ese lapso. El simulador usa el promedio (-0,27 pp por cada 10% de devaluación; rango -1,30 a +0,58 pp).
+
+---
+
+## Límites y Advertencias
+
+- **Los precios no cubren toda la serie.** Último mes con dato por combustible: **Nafta Premium: Mar 2022**, **Gasoil: Feb 2023**, **Nafta Súper: Oct 2023**. El gráfico de precios muestra los 104 meses con huecos y marca con un punto el último dato de cada combustible.
+- Los hitos de **Dic 2023** y **Ene 2024** caen fuera del rango con precios.
+- El **simulador de sensibilidad** es un modelo demostrativo, no una proyección validada. Mide asociación, no causalidad. En los datos el dólar siempre subió entre +20% y +349% interanual: valores fuera de ese rango son extrapolaciones. El coeficiente de sustitución es muy incierto (el signo cambia entre shocks).
+- Los datos de consumo y precios corresponden a una sola ciudad y no son extrapolables al país.
+
+---
+
+## Reproducibilidad
+
+El script usa sólo la librería estándar de Python (no requiere `requirements.txt`). Para regenerar los datos desde los CSV crudos:
+
+```bash
+python scripts/preprocess_data.py
+```
+
+Esto sobrescribe `data/fuel_economic_data.json` y `js/data.js`. Si se cambia la fuente, un hito o el título, hay que editar el script y volver a ejecutarlo, en lugar de modificar los archivos generados.
 
 ---
 

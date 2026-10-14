@@ -293,11 +293,11 @@ def build_dataset():
         "metadata": {
             "proyecto": "Grupo 4 - PPII (Práctica Profesionalizante II)",
             "carrera": "Tecnicatura Superior en Ciencia de Datos e Inteligencia Artificial",
-            "titulo": "Dashboard de Análisis de Combustibles y Variables Macroeconómicas",
+            "titulo": "Dashboard de Análisis de Combustibles y Variables Macroeconómicas - Ciudad de Corrientes",
             "fecha_generacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "fuentes": [
-                "Secretaría de Energía de la Nación (Consumo y Precios)",
-                "Datos Históricos Tipo de Cambio USD/ARS"
+                "Portal de Datos Abiertos de la Municipalidad de Corrientes (Consumo y Precios)",
+                "Investing.com - Datos históricos USD/ARS (es.investing.com/currencies/usd-ars-historical-data)"
             ]
         },
         "summary": summary,
