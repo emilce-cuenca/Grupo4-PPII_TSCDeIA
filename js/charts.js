@@ -56,7 +56,7 @@ const createMilestonesPlugin = (records) => ({
 
                     // 2. Altura escalonada del hito actual
                     const yPos = chartArea.top + yOffsets[hitoIndex % yOffsets.length];
-                    const labelText = '📍 ' + (r.hito.length > 20 ? r.hito.substring(0, 18) + '...' : r.hito);
+                    const labelText = (r.hito.length > 20 ? r.hito.substring(0, 18) + '...' : r.hito);
 
                     ctx.font = 'bold 9px Inter, sans-serif';
                     const textWidth = ctx.measureText(labelText).width;

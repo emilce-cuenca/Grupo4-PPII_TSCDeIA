@@ -103,3 +103,28 @@ npm i -g vercel
 vercel
 ```
 Sigue las instrucciones en pantalla aceptando las opciones predeterminadas.
+
+
+
+# Análisis de Combustibles & Macroeconomía — Corrientes (2017 - 2025)
+
+Dashboard interactivo desarrollado para la Práctica Profesionalizante II (TSCDelA). Permite analizar la evolución histórica de consumos, precios en surtidor y tipos de cambio USD/ARS.
+
+## 🛠 Tecnologías Utilizadas
+- **HTML5 / CSS3 / JavaScript (ES6+)**
+- **Chart.js** para la visualización de gráficos interactivos.
+- **Vercel** para despliegue y hosting continuo.
+
+## 📊 Metodología y Generación de Datos
+El archivo principal `fuel_economic_data.json` (ubicado en la carpeta `data/`) se genera a partir de las fuentes de datos crudas mediante scripts de procesamiento de datos que unifican las series temporales de volúmenes de combustibles, índices de precios y cotizaciones del dólar correspondientes al período analizado.
+
+## 🚀 Análisis: Próximos pasos (Evolución metodológica)
+
+| Indicador | Cómo | Por qué |
+| :--- | :--- | :--- |
+| **Precio real** | precio en pesos $\div$ IPC, con un mes base | Completa la pregunta de si el combustible se encareció en términos reales, hoy solo respondida en dólares. |
+| **Consumo per cápita** | consumo $\div$ población de la ciudad | Separa la caída de actividad del crecimiento de la población. La capa municipal de población sirve como base. |
+| **Elasticidad por combustible** | el mismo modelo, por separado para Súper, Premium y Gasoil | El gasoil responde a transporte y agro, no a consumo de hogares: es esperable que su elasticidad sea distinta. |
+
+## 👥 Grupo 4
+- Integrantes del equipo de desarrollo.
