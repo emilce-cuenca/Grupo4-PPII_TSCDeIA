@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       kpiTotalPillEl.className = `kpi-pill ${varConsumoPct >= 0 ? 'positive' : 'negative'}`;
       kpiTotalPillEl.textContent = `${varConsumoPct >= 0 ? '+' : ''}${varConsumoPct.toFixed(1).replace('.', ',')}% vs inicio`;
     }
-kpiTotalPillEl.textContent = `${varConsumoPct >= 0 ? '+' : ''}${varConsumoPct.toFixed(1).replace('.', ',')}% últimos 12 vs primeros 12 meses`;
+kpiTotalPillEl.textContent = `${varConsumoPct >= 0 ? '+' : ''}${varConsumoPct.toFixed(1).replace('.', ',')}% último año vs primer año`;
     // KPI Nafta Súper
     const kpiSuperEl = document.getElementById('kpiSuperValue');
     const kpiSuperPillEl = document.getElementById('kpiSuperPill');
