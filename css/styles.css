@@ -290,6 +290,11 @@ body {
 .kpi-card.kpi-super { --accent-color: var(--color-super); }
 .kpi-card.kpi-gasoil { --accent-color: var(--color-gasoil); }
 .kpi-card.kpi-usd { --accent-color: var(--color-usd); }
+.kpi-card.kpi-total {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
 
 .kpi-header {
   display: flex;
